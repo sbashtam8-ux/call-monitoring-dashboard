@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Call Monitoring Dashboard</title>
+<style>
+  body { font-family: Arial, sans-serif; background-color: #f0f2f5; margin: 0; padding: 0; }
+  header { background-color: #28a745; color: white; padding: 20px; text-align: center; font-size: 24px; font-weight: bold; }
+  main { padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+  .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); width: 400px; }
+  .card h2 { margin-top: 0; color: #333; }
+  .form-column { display: flex; flex-direction: column; gap: 10px; }
+  .form-field { display: flex; justify-content: flex-end; gap: 10px; align-items: center; }
+  input { padding: 8px; border-radius: 5px; border: 1px solid #ccc; flex: 1; }
+  input[type=number] { width: 100px; }
+  input#agentIssue { width: 300px; }
+  button { padding: 8px 12px; border: none; border-radius: 5px; background-color: #28a745; color: white; cursor: pointer; margin-top: 10px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 15px; text-align: right; }
+  th, td { border: 1px solid #ddd; padding: 8px; vertical-align: middle; text-align: right; color: #000; }
+  th { background-color: transparent; color: #000; }
+  .nameCell, .scoreCell, .issueCell { text-align: right; color: #000; }
+  .scoreCell.lowScore { color: #dc3545; font-weight: bold; }
+  .issueCell.lowScore { color: #dc3545; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<header>
+  Call Monitoring Dashboard
+</header>
+
+<main>
+  <div class="card">
+    <h2>Callbooking</h2>
+    <form id="callForm" class="form-column">
+      <div class="form-field">
+        <label for="agentName">کارشناس:</label>
+        <input type="text" id="agentName" placeholder="نام کارشناس" required>
+      </div>
+      <div class="form-field">
+        <label for="agentScore">امتیاز:</label>
+        <input type="number" id="agentScore" placeholder="0-100" min="0" max="100" required>
+      </div>
+      <div class="form-field">
+        <label for="agentIssue">مشکلات تماس:</label>
+        <input type="text" id="agentIssue" placeholder="مشکلات تماس">
+      </div>
+      <button type="submit">ثبت</button>
+      <button type="button" id="resetFormButton">Reset</button>
+    </form>
+
+    <table id="agentsTable">
+      <thead>
+        <tr>
+          <th></th>
+          <th></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Team Performance / عملکرد تیم</h2>
+    <canvas id="performanceChart"></canvas>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  let agents = JSON.parse(localStorage.getItem('agents')) || [];
+
+  const agentsTableBody = document.querySelector('#agentsTable tbody');
+  const ctx = document.getElementById('performanceChart').getContext('2d');
+
+  function getBarColor(score) {
+    if(score < 60) return '#dc3545';
+    if(score <= 80) return '#ffc107';
+    return '#28a745';
+  }
+
+  const chartData = {
+    labels: [],
+    datasets: [{ label: 'Score', data: [], backgroundColor: [] }]
+  };
+
+  const performanceChart = new Chart(ctx, {
+    type: 'bar',
+    data: chartData,
+    options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 }}}
+  });
+
+  function renderTable() {
+    agentsTableBody.innerHTML = '';
+    chartData.labels = [];
+    chartData.datasets[0].data = [];
+    chartData.datasets[0].backgroundColor = [];
+
+    agents.forEach((a) => {
+      const tr = document.createElement('tr');
+      const scoreClass = a.score < 50 ? 'scoreCell lowScore' : 'scoreCell';
+      const issueClass = a.issue.trim() !== '' ? 'issueCell lowScore' : 'issueCell';
+      tr.innerHTML = `
+        <td class="nameCell">${a.name}</td>
+        <td class="${scoreClass}">${a.score}</td>
+        <td class="${issueClass}">${a.issue}</td>
+      `;
+      agentsTableBody.appendChild(tr);
+
+      chartData.labels.push(a.name);
+      chartData.datasets[0].data.push(a.score);
+      chartData.datasets[0].backgroundColor.push(getBarColor(a.score));
+    });
+
+    performanceChart.update();
+    localStorage.setItem('agents', JSON.stringify(agents));
+  }
+
+  function addAgentCall(event) {
+    event.preventDefault();
+    const nameInput = document.getElementById('agentName');
+    const scoreInput = document.getElementById('agentScore');
+    const issueInput = document.getElementById('agentIssue');
+    const name = nameInput.value.trim();
+    let score = parseInt(scoreInput.value);
+    const issue = issueInput.value.trim();
+
+    if(!name) { alert('لطفاً نام کارشناس را وارد کنید'); return; }
+    if(isNaN(score) || score < 0 || score > 100) { alert('امتیاز باید عددی بین 0 تا 100 باشد'); return; }
+
+    agents.push({name, score, issue});
+    nameInput.value = '';
+    scoreInput.value = 0;
+    issueInput.value = '';
+    renderTable();
+  }
+
+  function resetForm() {
+    document.getElementById('agentName').value = '';
+    document.getElementById('agentScore').value = 0;
+    document.getElementById('agentIssue').value = '';
+    agents = [];
+    renderTable();
+  }
+
+  document.getElementById('callForm').addEventListener('submit', addAgentCall);
+  document.getElementById('resetFormButton').addEventListener('click', resetForm);
+
+  renderTable();
+</script>
+
+</body>
+</html>
